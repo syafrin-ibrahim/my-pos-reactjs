@@ -8,30 +8,36 @@ import Private from './pages/private';
 
 import PrivateRoute from './components/PrivateRoute';
 import FirebaseProvider from './components/FirebaseProvider';
-
+import CssBaseline from '@material-ui/core/CssBaseline';
+import ThemeProvider from '@material-ui/styles/ThemeProvider';
+import theme from './config/theme';
 function App() {
   return (
-    <FirebaseProvider>
-        <Fragment>
-          <Router>
-            <Switch>
+    <>
+    <CssBaseline>
+      <ThemeProvider  theme={theme}>
+          <FirebaseProvider>
+            
+                <Router>
+                  <Switch>
+                  
+                      <Route path="/registrasi" component={Registrasi} />
+                      <Route path="/login" component={Login} />
+                      <Route path="/forgot-pass" component={ForgotPass} />
+                      <PrivateRoute path="/pengaturan" component={Private} />
+                      <PrivateRoute path="/produk" component={Private} />
+                      <PrivateRoute path="/transaksi" component={Private} />
+                      <PrivateRoute path="/" exact component={Private} />
+                      <PrivateRoute component={NotFound} />
 
-              
-                <Route path="/registrasi" component={Registrasi} />
-                <Route path="/login" component={Login} />
-                <Route path="/forgot-pass" component={ForgotPass} />
-                <PrivateRoute path="/pengaturan" component={Private} />
-                <PrivateRoute path="/produk" component={Private} />
-                <PrivateRoute path="/transaksi" component={Private} />
-                <PrivateRoute path="/" exact component={Private} />
-                <PrivateRoute component={NotFound} />
+                  </Switch>
+                </Router>
+            
 
-            </Switch>
-          </Router>
-        </Fragment>
-
-    </FirebaseProvider>
-   
+          </FirebaseProvider>
+    </ThemeProvider>
+    </CssBaseline>
+   </>
   );
 }
 

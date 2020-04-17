@@ -7,10 +7,15 @@ import {useFirebase} from '../../../components/FirebaseProvider';
 import {useDocument} from 'react-firebase-hooks/firestore';
 import AppPageLoad from '../../../components/appPageloading';
 import { useSnackbar } from 'notistack';
-
-
+import useStyles from './styles/edit';
+import UploadIcon from '@material-ui/icons/CloudUpload';
+import SaveIcon from '@material-ui/icons/Save';
+import {Prompt} from 'react-router-dom';
+ 
 function EditProduk({match}){
-    const {firestore, user} = useFirebase();
+    const classes = useStyles();
+    const {firestore, storage, user} = useFirebase();
+    const produkRef = storage.ref(`toko/${user.uid}/produk`);
     const produkDoc = firestore.doc(`toko/${user.uid}/produk/${match.params.idProduk}`);
     console.log('produk doc ==>',match.params.idProduk);
     const [snapshot, loading] = useDocument(produkDoc);
@@ -32,6 +37,9 @@ function EditProduk({match}){
     })
 
     const [isSubmitting, setSubmitting] = useState(false);
+
+    const [isChange, setChange] = useState(false);
+
     useEffect(()=>{
             if(snapshot){
                     
@@ -48,6 +56,7 @@ function EditProduk({match}){
         return <AppPageLoad></AppPageLoad>
     }
 
+    
     const handleChange = (e)=>{
         setForm({
             ...form,
@@ -58,6 +67,8 @@ function EditProduk({match}){
             ...error,
             [e.target.name] : ''
         })
+
+        setChange(true);
     }
 
     const validate = (e)=>{
@@ -88,12 +99,74 @@ function EditProduk({match}){
 
                 await produkDoc.set(form,{merge : true})
                 enqueueSnackbar('data produk berhasil disimpan', {variant : 'success'})
+                setChange(false);
             }catch(e){
                 enqueueSnackbar(e.message, {variant : 'error'})
             }
             setSubmitting(false);
         }
     }
+
+    const handleUpload = async (e)=>{
+        const file = e.target.files[0];
+        if(!['image/png','image/jpeg'].includes(file.type)){
+            setError({
+                ...error,
+                foto : `Tipe File Tidak Mendukung ${file.type}`
+            })
+        }else if(file.size >= 512000){
+            setError({
+                ...error,
+                foto : `Ukuran File Lebih Besar Dari 500 kb `
+            })
+        }else{
+
+            const reader = new FileReader();
+            reader.onabort = ()=>{
+                setError((error)=>({
+                    ...error,
+                    foto : 'proses pembacaan file dibatalkan'
+                }));
+            }
+
+            reader.onerror = ()=>{
+                setError((error)=>({
+                    ...error,
+                    foto : 'file tidak bisa dibaca'
+                }));
+            }
+
+            reader.onload = async ()=>{
+                    setSubmitting(true);
+                    try{
+                        const fotoExt = file.name.substring(file.name.lastIndexOf('.'));
+
+                        const fotoRef = produkRef.child(`${match.params.idProduk}${fotoExt}`);
+                        const fotoSnapShoot = await  fotoRef.putString(reader.result, 'data_url');     
+                        const fotoUrl = await fotoSnapShoot.ref.getDownloadURL()
+
+                        setForm(currentForm => ({
+                            ...currentForm,
+                            foto : fotoUrl
+
+                        }));
+                        setChange(true);
+                    }catch(e){
+                        setError((error)=>({
+                            ...error,
+                            foto : e.message
+                        }));
+                    }
+                    setSubmitting(false);
+            }
+
+            reader.readAsDataURL(file);
+
+
+        }
+    }
+
+    
 
     return (
        
@@ -174,12 +247,35 @@ function EditProduk({match}){
                         </form>
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <Typography>Upload Gambar</Typography>
+                        <div className={classes.upload}>
+                                <Typography>Upload Gambar</Typography>
+                                {form.foto &&
+                                <img src={form.foto} alt={`Foto Produk ${form.nama}`} className={classes.preview    }/>}
+                                <input type="file"
+                                        className={classes.hideText}
+                                    name="gbr" 
+                                    id="gbr"
+                                    accept="image/jpeg, image/png"
+                                    onChange={handleUpload}/>
+                                <label htmlFor="gbr">
+                                <Button variant="outlined" component="span" disabled={isSubmitting}>upload <UploadIcon className={classes.icon}/></Button>
+                                </label>
+                                { error.foto &&
+                                <Typography color="error">
+                                    {error.foto}
+                                </Typography> }
+                        </div>
                     </Grid>
                     <Grid item xs={12}>
-                        <Button form="produk-form" type="submit" disabled={isSubmitting} color="primary" variant="contained">Simpan</Button>
+                        <div className={classes.actionButton}>
+                        <Button form="produk-form" type="submit" disabled={isSubmitting || !isChange} color="primary" variant="contained"><SaveIcon className={classes.iconLeft}/> Simpan</Button>
+                        </div>
                     </Grid>
                 </Grid>
+                <Prompt
+                    when={isChange}
+                    message="terdapat perubahan yang belum disimpan, apakah anda yakin meninggalkan halaman ini ? "
+                    />
             </div>
       
     );

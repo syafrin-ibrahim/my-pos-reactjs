@@ -15,6 +15,15 @@ import ImageIcon from '@material-ui/icons/Image';
 import TextField from '@material-ui/core/TextField';
 import AppPageLoading from '../../../components/appPageloading';
 import useStyles from './styles';
+import { useSnackbar } from 'notistack';
+import Table from '@material-ui/core/Table';
+import TableRow from '@material-ui/core/TableRow';
+import TableHead from '@material-ui/core/TableHead';
+import TableBody from '@material-ui/core/TableBody';
+import TableCell from '@material-ui/core/TableCell';
+import {currency} from '../../../utils/formatter';
+
+
 // const handleClick = ()=>{
 
 // }
@@ -26,7 +35,13 @@ function Home(){
     const [filter, setFilter] = useState('');
     const [Items, setItem] = useState([]);
     const classes = useStyles();
+    const [transaksi, setTransaksi] = useState({
+        items : {
 
+        }
+    })
+
+    const {enqueueSnackbar} = useSnackbar();
     useEffect(()=>{
         if(snapProduk){
          
@@ -44,11 +59,98 @@ function Home(){
         return <AppPageLoading></AppPageLoading>
     }
 
+   // event klik item
+    const addItem = produkDoc =>e=>{
+        let newItem = {...transaksi.items[produkDoc.id]};
+
+        const data = produkDoc.data();
+
+        if(newItem.jumlah){
+            newItem.jumlah = newItem.jumlah + 1;
+            newItem.subtotal = data.harga * newItem.jumlah;
+        }else{
+            newItem.jumlah = 1;
+            newItem.harga = data.harga;
+            newItem.subtotal = data.harga;
+            newItem.nama = data.nama; 
+        }
+
+        const newItems =  { ...transaksi.items, [produkDoc.id] : newItem  }
+        if(newItem.jumlah > data.stock){
+            enqueueSnackbar('jumlah item lebih dari jumlah stok produk', {variant : 'error'});
+        }else{
+            setTransaksi((transaksi)=>({
+                ...transaksi,
+                items : newItems,
+                total : Object.keys(newItems).reduce((total, k)=>{
+                    const it = newItems[k];
+                    return total + parseInt(it.subtotal);
+                }, 0) 
+            }))
+        }
+    }
+
+    const handleChangeJml = k => (e)=>{
+        let newItem = {...transaksi.items[k]};
+            newItem.jumlah  = parseInt(e.target.value);
+            newItem.subtotal = newItem.harga * newItem.jumlah;
+
+            const Produk = Items.find(item => item.id === k);
+            const data = Produk.data();
+            const newItems =  { ...transaksi.items, [k] : newItem  }
+            if(newItem.jumlah > data.stock){
+                enqueueSnackbar('jumlah item lebih dari jumlah stok produk', {variant : 'error'});
+            }else{
+                setTransaksi((transaksi)=>({
+                    ...transaksi,
+                    items : newItems,
+                    total : Object.keys(newItems).reduce((total, k)=>{
+                        const it = newItems[k];
+                        return total + parseInt(it.subtotal);
+                    }, 0) 
+                }))
+            }
+    }
+
     return (
         <>
         <h1 variant="h5" component="h1" paragraph="true">Buat Transaksi Baru</h1> 
-        <Grid container>
-            <Grid item xs={12}>
+        <Grid container spacing={5}>
+            <Grid item xs={6} md={6}>
+                    <Table>
+                        <TableHead>
+                            <TableCell>Item</TableCell>
+                            <TableCell>Jumlah</TableCell>
+                            <TableCell>Harga</TableCell>
+                            <TableCell>Total</TableCell>
+                        </TableHead>
+                        <TableBody>
+                            {
+                                Object.keys(transaksi.items).map(k=>{
+                                    const item = transaksi.items[k];
+                                   
+                                    return (
+                                        <TableRow key={k}>
+                                            <TableCell>{item.nama}</TableCell>
+                                            <TableCell>
+                                                <TextField className={classes.inputText} value={item.jumlah} type="number" onChange={handleChangeJml(k)}/>
+                                            </TableCell>
+                                            <TableCell>{currency(item.harga)}</TableCell>
+                                            <TableCell>{currency(item.subtotal)}</TableCell>
+                                        </TableRow>
+                                    )
+                                })
+                            }
+                            <TableRow>
+                                <TableCell colspan={3}>Total</TableCell>
+                        <TableCell>{currency(transaksi.total)}</TableCell>
+
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+            </Grid>
+          
+            <Grid item xs={6} md={6}>
                     <List className={classes.produkList} component="nav" 
                     subheader={
                         <ListSubheader component="div">
@@ -68,8 +170,8 @@ function Home(){
                             {
                                 Items.map((produkDoc)=>{
                                     const data = produkDoc.data();
-                                    console.log('datanya => ', data);
-                                    return <ListItem key={produkDoc.id} button disabled={!data.stock}>
+                                    console.log('datanya => ', produkDoc.data());
+                                    return <ListItem key={produkDoc.id} button disabled={!data.stock} onClick={addItem(produkDoc)}>
 
                                                {
                                                    data.foto ? 

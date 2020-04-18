@@ -13,6 +13,11 @@ service cloud.firestore {
       
       }
 
+      match /transaksi/{produkId}{
+        allow read, write: if request.auth.uid == uid;
+      
+      }
+
     }
   }
 }

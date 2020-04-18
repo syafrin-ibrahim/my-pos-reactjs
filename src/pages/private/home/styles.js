@@ -9,6 +9,9 @@ const useStyles = makeStyles(theme => ({
         },
         inputText : {
             width : 25
+        },
+        iconLeft : {
+            marginRight : theme.spacing(1)
         }
 
 }));

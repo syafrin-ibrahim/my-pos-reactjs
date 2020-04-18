@@ -22,7 +22,8 @@ import TableHead from '@material-ui/core/TableHead';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import {currency} from '../../../utils/formatter';
-
+import format from 'date-fns/format';
+import SaveIcon from '@material-ui/icons/Save';
 
 // const handleClick = ()=>{
 
@@ -35,13 +36,34 @@ function Home(){
     const [filter, setFilter] = useState('');
     const [Items, setItem] = useState([]);
     const classes = useStyles();
-    const [transaksi, setTransaksi] = useState({
+    const todayString = format(new Date(), 'yyyy-MM-dd');
+    const transaksiCol = firestore.collection(`toko/${user.uid}/transaksi`);
+    const [snapTransaksi, loadTransaksi] = useCollection(transaksiCol.where('tanggal','==', todayString));
+    const initialTransaksi = {
+        no : '',
         items : {
 
-        }
-    })
-
+        },
+        total : 0,
+        tanggal : todayString
+    }
+    const [transaksi, setTransaksi] = useState(initialTransaksi)
+    const [isSubmitting, setSubmitting] = useState(false);
     const {enqueueSnackbar} = useSnackbar();
+    useEffect(()=>{
+        if(snapTransaksi){
+            setTransaksi(transaksi=>({
+                ...transaksi,
+                no : `${transaksi.tanggal}/${snapTransaksi.docs.length + 1}`
+            }))
+        }else{
+            setTransaksi(transaksi=>({
+                ...transaksi,
+                no : `${transaksi.tanggal}/1`
+            }))
+        }
+
+    },[snapTransaksi])
     useEffect(()=>{
         if(snapProduk){
          
@@ -55,7 +77,7 @@ function Home(){
         }
     },[snapProduk, filter]);
 
-    if(loadingProduk){
+    if(loadingProduk || loadTransaksi){
         return <AppPageLoading></AppPageLoading>
     }
 
@@ -112,9 +134,66 @@ function Home(){
             }
     }
 
+    const simpanTransaksi = async (e)=>{
+            if(Object.keys(transaksi.items).length <= 0){
+                enqueueSnackbar('Tidak ada transaksi untuk disimpan', {variant : 'error'});
+                return false;
+            }else{
+
+                setSubmitting(true);
+                try{
+                await transaksiCol.add({
+                    ...transaksi,
+                    timestamp : Date.now()
+                })
+
+                //update stock produk
+
+                await firestore.runTransaction(transaction=>{
+                        const ProdukIds = Object.keys(transaksi.items);
+                        return Promise.all(ProdukIds.map(ProdukId=>{
+                            const ProdukRef = firestore.doc(`toko/${user.uid}/produk/${ProdukId}`);
+                            return transaction.get(ProdukRef).then((producDoc)=>{
+                                if(!producDoc.exists){
+                                    throw Error('Produk tidak ada ')
+                                }
+
+                                let newStock = parseInt(producDoc.data().stock)- parseInt(transaksi.items[ProdukId].jumlah);
+                                if(newStock  < 0 ){
+                                    newStock = 0
+                                }
+
+                                transaction.update(ProdukRef, { stock : newStock});
+                            })
+                        }))
+                })
+                    enqueueSnackbar('Transaksi Berhasil Disimpan', {variant : 'success'});
+                    setTransaksi(transaksi => ({
+                        ...initialTransaksi,
+                        no : transaksi.no        
+                    }));
+               }catch(e){
+                    enqueueSnackbar(e.message, {variant : 'error'});
+               }
+               setSubmitting(false);
+
+            }
+            
+    }
+
     return (
         <>
         <h1 variant="h5" component="h1" paragraph="true">Buat Transaksi Baru</h1> 
+        <Grid container>
+            <Grid item xs>
+                <TextField label="No Transaksi" value={transaksi.no} inputProps={{ readOnly: true}} />
+            </Grid>
+            <Grid item xs>
+                <Button variant="contained" color="primary" onClick={simpanTransaksi} disabled={isSubmitting}>
+                    <SaveIcon className={classes.iconLeft} /> Simpan Transaksi
+                </Button>
+            </Grid>
+        </Grid>
         <Grid container spacing={5}>
             <Grid item xs={6} md={6}>
                     <Table>
@@ -133,7 +212,7 @@ function Home(){
                                         <TableRow key={k}>
                                             <TableCell>{item.nama}</TableCell>
                                             <TableCell>
-                                                <TextField className={classes.inputText} value={item.jumlah} type="number" onChange={handleChangeJml(k)}/>
+                                                <TextField className={classes.inputText} value={item.jumlah} type="number" onChange={handleChangeJml(k)} disabled={isSubmitting}/>
                                             </TableCell>
                                             <TableCell>{currency(item.harga)}</TableCell>
                                             <TableCell>{currency(item.subtotal)}</TableCell>
@@ -171,7 +250,7 @@ function Home(){
                                 Items.map((produkDoc)=>{
                                     const data = produkDoc.data();
                                     console.log('datanya => ', produkDoc.data());
-                                    return <ListItem key={produkDoc.id} button disabled={!data.stock} onClick={addItem(produkDoc)}>
+                                    return <ListItem key={produkDoc.id} button disabled={!data.stock || isSubmitting } onClick={addItem(produkDoc)}>
 
                                                {
                                                    data.foto ? 

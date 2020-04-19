@@ -163,6 +163,7 @@ const sendEmailVerification = async(e)=>{
           name="displayName"
           label="Nama"
           margin="normal"
+          fullWidth="true"
           defaultValue = {user.displayName}
           inputProps={{
               ref : displayNameRef,
@@ -178,6 +179,8 @@ const sendEmailVerification = async(e)=>{
           label="EMail"
           type="email"
           margin="normal"
+          fullWidth="true"
+
           defaultValue = {user.email}
           inputProps={{
               ref : displayEmailRef,
@@ -198,6 +201,7 @@ const sendEmailVerification = async(e)=>{
 
           <TextField
           name="password"
+          fullWidth="true"
           id="password"
           label="Password Baru"
           margin="normal"

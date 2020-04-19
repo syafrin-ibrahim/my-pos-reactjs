@@ -174,6 +174,7 @@ function Home(){
                     }));
                }catch(e){
                     enqueueSnackbar(e.message, {variant : 'error'});
+                    console.log("message error = ", e.message);
                }
                setSubmitting(false);
 
